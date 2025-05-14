@@ -1,0 +1,9 @@
+Use "ARMA 3 ADDON BUILDER" from Arma 3 Tools. Arma 3 tools is free and can be downloaded on steam.
+For addon source directory chose path to lbl folder.
+For destination directory or filename chose lbl\addons. Create "addons" folder if doesnt exist.
+Check "Clear temp folder".
+Uncheck "Sign output PBO file".
+Uncheck "Binarize".
+Under "OPTIONS" in "GENERAL", make sure that "List of files to coppy directly" includes "*.sqf".
+Confirm all changes an then you can click "PACK".
+Packing proces is going to fail if pbo is being curenlty used by game.
