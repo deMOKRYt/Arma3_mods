@@ -9,4 +9,4 @@ if (_name in MOO_score_board) then {
 } else {
 	MOO_score_board set [_name, _score];
 };
-diag_log ["MOO", MOO_mission_start_system_time, "UPDATED_SCORE_BOARD_IS:" MOO_score_board];
+diag_log ["MOO", MOO_mission_start_system_time, "UPDATED_SCORE_BOARD_IS:", MOO_score_board];
