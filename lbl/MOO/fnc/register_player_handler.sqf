@@ -14,4 +14,3 @@ my_unit addEventHandler ["HandleScore", {
 	params ["_unit", "_object", "_score"];
 	[_unit, _score] spawn MOO_fnc_update_board;
 }];
-
