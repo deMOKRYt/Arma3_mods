@@ -49,7 +49,7 @@ def save_data_store_to_disc(config, data_store):
 def eval_text (text):
     data={}
     try:
-        t = literal_eval(text[9:])
+        t = literal_eval(text)
         if t[0] == "MOO":
             if "SCORE_BOARD" in t[2]:
                 data["date_stamp"] = str(t[1][0])
