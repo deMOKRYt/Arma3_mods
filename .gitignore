@@ -1,0 +1,6 @@
+# ignoring Venv specific stuff and json configs
+Include
+Lib
+Scripts
+pyvenv.cfg
+*.json
