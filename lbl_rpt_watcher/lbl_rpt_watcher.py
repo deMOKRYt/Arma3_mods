@@ -51,7 +51,6 @@ def save_data_store_to_disc(config, data_store):
 
 def eval_text (text):
     data={}
-    global do_steam_post
     try:
         t = literal_eval(text)
         if t[0] == "MOO":
