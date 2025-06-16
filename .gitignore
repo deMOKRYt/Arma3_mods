@@ -3,4 +3,5 @@ Include
 Lib
 Scripts
 pyvenv.cfg
-*.json
+config.json
+data_store.json

@@ -9,7 +9,14 @@ import os
 import signal
 from pywinauto import Desktop
 import re
+import traceback
+import ctypes
+import pyodbc
+import datetime
 
+def prevent_win_idle():
+    ctypes.windll.kernel32.SetThreadExecutionState(0x80000002)
+    ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
 
 def load_config():
     config = {"last_rpt": None,
@@ -17,7 +24,12 @@ def load_config():
               "seconds_betwean_scans": 20,
               "data_store_filename": os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop', 'data_store.json'),
               "steam_group_name": None,
-              "steam_group_channel": None
+              "steam_group_channel": None,
+              "steam_last_published_mission_datestamp": None,
+              "database_address": None,
+              "database_user": None,
+              "database_pwd": None,
+              "database_name": None
               }
 
     if os.path.exists('config.json'):
@@ -78,6 +90,11 @@ def update_mission_data_store(config, data_store, data):
             save_data_store_to_disc(config, data_store)
 
 def analyze_rpt (config, data_store):
+    # ["MOO",
+    # [[2025,5,26,19,59,48,146],"ACPL 12 KillHouses - Classic"],
+    # "SCORE_BOARD_AFTER_MISSION_END_IS:",
+    # [["deMO [ACPL]", 21], ["Jon [ACPL]", 22], ["Łysy", 23],]]
+    mission_ended = False
     if my_config['last_rpt'] is None:
         print('Update config.json - last_rpt log has not been chosen.')
         return False
@@ -94,9 +111,9 @@ def analyze_rpt (config, data_store):
                 else:
                     print(f"  mission_data is: {scores}")
                     update_mission_data_store(config, data_store, scores)
-                    post_to_steam(config, scores)
+                    mission_ended = True
                     break
-    return True
+    return (mission_ended, scores)
 
 class SignalHandler:
     shutdown_requested = False
@@ -145,9 +162,9 @@ def post_to_steam(config, data):
         scores = data['score_board']
         lines=''
         lines+=mission
-        lines+='{VK_SHIFT down}{ENTER 2}{VK_SHIFT up}'
+        lines+='{VK_SHIFT down}{ENTER}{VK_SHIFT up}'
         for i in scores:
-            buf=''
+            buf='--'
             buf+= keborderize(i[0])
             buf+='{SPACE}-{SPACE}'
             buf+=str(i[1])
@@ -155,7 +172,7 @@ def post_to_steam(config, data):
             lines+=buf
         lines+='{ENTER}'
         return lines
-    
+        
     try:  
         main_window = Desktop(backend='uia').window(best_match=group_name)
         a3_feedback = Desktop(backend='uia').window(best_match=group_name).child_window(title=group_channel, control_type="Group")
@@ -164,6 +181,54 @@ def post_to_steam(config, data):
         a3_feedback.type_keys(pritify(data))                            
     except:
        print('Exception occured while posting results to Steam.')
+       traceback.print_exc()
+
+def db_insert_mission(config, data):
+    date_str = data["date_stamp"]
+    mission_name_str = data["name"]
+    scores = data["score_board"]
+    connection_string = (
+        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"SERVER={config['database_address']};"
+        f"DATABASE={config['database_name']};"
+        f"UID={config['database_user']};"
+        f"PWD={config['database_pwd']}")
+
+    def date_str_to_datetime_str(date_string):
+        # date_string = "[2025, 5, 20, 12, 33, 4, 211]"
+        x=eval(date_string)
+        x[6]=1000*x[6]
+        date=str(datetime.datetime(*x))
+        return date
+    
+    def chose_corect_mission(rows):
+        if len(rows) > 1:
+            raise NotImplementedError ("Can't handle situation where there is more than one mission with same date stamp!")
+        if len(rows) == 1 :
+            raise NotImplementedError ("Mission with provided time stump alrady exists in database, updating not supported yet!")
+        else:
+            return None    
+    
+    try:
+        date = date_str_to_datetime_str(date_str)
+        connection = pyodbc.connect(connection_string)
+        cursor = connection.cursor()
+        query = f"SELECT [Id] FROM [acpl].[dbo].[Missions] WHERE [acpl].[dbo].[Missions].[DateStamp] = '{date}'"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        row_id = chose_corect_mission(rows)
+        if row_id is None:
+            query = f"INSERT INTO [acpl].[dbo].[Missions] (Name, DateStamp) OUTPUT INSERTED.Id VALUES ('{mission_name_str}', '{date}')"
+            cursor.execute(query)
+            row = cursor.fetchone()
+            row_id = row[0]
+        for player, score in scores:                
+            query = f"INSERT INTO [acpl].[dbo].[Scores] VALUES ('{player}', {score}, {row_id})"
+            cursor.execute(query)
+        cursor.commit()        
+    finally:
+        if 'connection' in locals():
+            connection.close()
 
 my_config = load_config()
 my_data_store = load_data_store(my_config)
@@ -177,10 +242,18 @@ observer.start()
 try:
     while signal_handler.can_run():
         if was_modified:
-            analyze_rpt (my_config, my_data_store)
+            m=analyze_rpt (my_config, my_data_store)
             print('analyze done')
+            m_end=m[0]
+            m_score=m[1]
+            if m_end==True:
+                if my_config['steam_last_published_mission_datestamp'] != m_score['date_stamp']:
+                    update_config(my_config, 'steam_last_published_mission_datestamp', m_score['date_stamp'])
+                    db_insert_mission(my_config, m_score)
+                    post_to_steam(my_config, m_score)
             was_modified = False
         time.sleep(my_config["seconds_betwean_scans"])
+        prevent_win_idle()
 finally:
     observer.stop()
     observer.join()
