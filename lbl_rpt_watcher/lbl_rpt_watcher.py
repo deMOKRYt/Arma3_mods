@@ -96,6 +96,7 @@ def analyze_rpt (config, data_store):
     # "SCORE_BOARD_AFTER_MISSION_END_IS:",
     # [["deMO [ACPL]", 21], ["Jon [ACPL]", 22], ["Łysy", 23],]]
     mission_ended = False
+    score = None
     if my_config['last_rpt'] is None:
         print('Update config.json - last_rpt log has not been chosen.')
         return False
@@ -279,7 +280,7 @@ try:
             print('analyze done')
             m_end=m[0]
             m_score=m[1]
-            if m_end==True:
+            if m_end and m_score is not None:
                 if my_config['steam_last_published_mission_datestamp'] != m_score['date_stamp']:
                     update_config(my_config, 'steam_last_published_mission_datestamp', m_score['date_stamp'])
                     db_insert_mission(my_config, m_score)
