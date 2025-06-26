@@ -29,8 +29,9 @@ def load_config():
               "database_address": None,
               "database_user": None,
               "database_pwd": None,
-              "database_name": None
-              }
+              "database_name": None,
+              "web_page": None
+    }
 
     if os.path.exists('config.json'):
         with open("config.json", "r") as f:
@@ -145,40 +146,72 @@ def post_to_steam(config, data):
     group_name = config['steam_group_name']
     group_channel = config['steam_group_channel']
 
-    def keborderize(sentence : str):
-        abc123=re.sub(r'[^ \w+]', '', sentence)
+    def keborderize(sentence : str, is_name : bool):
+        
+        special_keys = {'!': '{VK_SHIFT down}'+'1'+'{VK_SHIFT up}',
+                        '@': '{VK_SHIFT down}'+'2'+'{VK_SHIFT up}',
+                        '#': '{VK_SHIFT down}'+'3'+'{VK_SHIFT up}',
+                        '$': '{VK_SHIFT down}'+'4'+'{VK_SHIFT up}',
+                        '%': '{VK_SHIFT down}'+'5'+'{VK_SHIFT up}',
+                        '^': '{VK_SHIFT down}'+'6'+'{VK_SHIFT up}',
+                        '&': '{VK_SHIFT down}'+'7'+'{VK_SHIFT up}',
+                        '*': '{VK_SHIFT down}'+'8'+'{VK_SHIFT up}',
+                        '(': '{VK_SHIFT down}'+'9'+'{VK_SHIFT up}',
+                        ')': '{VK_SHIFT down}'+'0'+'{VK_SHIFT up}',
+                        '_': '{VK_SHIFT down}'+'-'+'{VK_SHIFT up}',
+                        '+': '{VK_SHIFT down}'+'='+'{VK_SHIFT up}',
+                        '?': '{VK_SHIFT down}'+'/'+'{VK_SHIFT up}',
+                        '|': '{VK_SHIFT down}'+'\\'+'{VK_SHIFT up}',
+                        ':': '{VK_SHIFT down}'+';'+'{VK_SHIFT up}'                        
+        }
+        if is_name:
+            abc123=re.sub(r'[^ \w+]', '', sentence)
+        else:
+            abc123=sentence
+        out=[]
         buf=''
+        print (abc123)
         for l in abc123:
             if l.isupper():
                 buf+='{VK_SHIFT down}'+l+'{VK_SHIFT up}'
             elif l == ' ':
                 buf+='{SPACE}'
+                out.append(buf)
+                buf = ''
+            elif (l in special_keys.keys()):
+                buf+= special_keys[l]
             else:
                 buf+=l
-        return buf
+            out.append(buf)
+            buf=''
+        return out
 
     def pritify(data):
-        mission = keborderize(data['name'])
+        to_type = []
         scores = data['score_board']
-        lines=''
-        lines+=mission
-        lines+='{VK_SHIFT down}{ENTER}{VK_SHIFT up}'
+        if config["web_page"]:
+            to_type += keborderize(config["web_page"], False)
+            to_type.append('{VK_SHIFT down}{ENTER 2}{VK_SHIFT up}')
+        to_type += keborderize(data['name'], False) # mission
+        to_type.append('{VK_SHIFT down}{ENTER}{VK_SHIFT up}')
         for i in scores:
             buf='--'
-            buf+= keborderize(i[0])
-            buf+='{SPACE}-{SPACE}'
+            buf+= ''.join(keborderize(i[0], True))
+            buf+="{SPACE}-{SPACE}"
             buf+=str(i[1])
             buf+='{VK_SHIFT down}{ENTER}{VK_SHIFT up}'
-            lines+=buf
-        lines+='{ENTER}'
-        return lines
-        
-    try:  
+            to_type.append(buf)
+        to_type.append('{ENTER}')
+        return to_type
+    
+    try:
         main_window = Desktop(backend='uia').window(best_match=group_name)
         a3_feedback = Desktop(backend='uia').window(best_match=group_name).child_window(title=group_channel, control_type="Group")
         main_window.set_focus()
         a3_feedback.click_input()
-        a3_feedback.type_keys(pritify(data))                            
+        tt= pritify(data)
+        for i in tt:
+            a3_feedback.type_keys(i, vk_packet=False)                         
     except:
        print('Exception occured while posting results to Steam.')
        traceback.print_exc()
