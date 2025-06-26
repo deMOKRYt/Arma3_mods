@@ -29,8 +29,9 @@ def load_config():
               "database_address": None,
               "database_user": None,
               "database_pwd": None,
-              "database_name": None
-              }
+              "database_name": None,
+              "web_page": None
+    }
 
     if os.path.exists('config.json'):
         with open("config.json", "r") as f:
